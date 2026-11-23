@@ -19,6 +19,7 @@ foreach ($name in $targets) {
   if (-not (Test-Path -LiteralPath $path)) { continue }
   $text = [System.IO.File]::ReadAllText($path, [System.Text.Encoding]::UTF8)
   $text = $text.Replace("$OldUser/$OldRepo", "$GitHubUser/$Repo")
+  $text = $text.Replace($OldRepo, $Repo)
   $text = $text.Replace($OldUser, $GitHubUser)
   [System.IO.File]::WriteAllText($path, $text, $Utf8NoBom)
 }
