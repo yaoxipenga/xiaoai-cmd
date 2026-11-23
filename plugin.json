@@ -1,8 +1,8 @@
 {
   "$schema": "https://raw.githubusercontent.com/songloft-org/plugin-toolchain/main/schemas/plugin.schema.json",
   "name": "小爱文字指令",
-  "version": "1.1.0",
-  "description": "免唤醒、免麦克风：在页面输入文字，让小爱音箱像听到这句话一样执行指令（接听电话、暂停、关灯等）",
+  "version": "2.0.0",
+  "description": "免唤醒、免麦克风：输入或语音说出一句话，让小爱音箱像听到这句话一样执行指令；移动端 / App 专属界面、自定义弹出选择器与设备在线状态",
   "author": "yaoxipenga",
   "homepage": "https://github.com/yaoxipenga/xiaoai-cmd",
   "license": "MIT",
@@ -19,5 +19,5 @@
   "updateUrl": "https://raw.githubusercontent.com/yaoxipenga/xiaoai-cmd/main/manifest.json",
   "download_url": "https://raw.githubusercontent.com/yaoxipenga/xiaoai-cmd/main/xiaoai-text-command.jsplugin.zip",
   "entryHash": "d53aff9e9df6795bcb9a52734713e0cdb04b5e76eebc9ad6108937435bc2a095",
-  "zipHash": "1301dc91999c982510be17cc15537f4deeb215a6f88238c6e6a8b8618de6704f"
+  "zipHash": "4de2ebfe8a0e0387a8aeb53506c6a257f0cc0eb9f10f2406047f85e949da10af"
 }
