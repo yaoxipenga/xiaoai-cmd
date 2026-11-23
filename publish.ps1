@@ -1,6 +1,6 @@
 param(
   [string]$GitHubUser = "yaoxipenga",
-  [string]$Repo = "songloft-xiaoai-text-command",
+  [string]$Repo = "xiaoai-cmd",
   [string]$Branch = "main",
   [switch]$NoPush
 )
@@ -9,17 +9,17 @@ $ErrorActionPreference = "Stop"
 Set-Location -LiteralPath $PSScriptRoot
 
 $OldUser = "yaoxipenga"
-$OldRepo = "songloft-xiaoai-text-command"
+$CurrentRepo = "xiaoai-cmd"
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
-# 1) Replace GitHub user / repo name in every published text file.
+# 1) Replace the current GitHub user / repo name in every published text file.
 $targets = @("registry.json", "plugin.json", "manifest.json", "README.md", "build.py")
 foreach ($name in $targets) {
   $path = Join-Path $PSScriptRoot $name
   if (-not (Test-Path -LiteralPath $path)) { continue }
   $text = [System.IO.File]::ReadAllText($path, [System.Text.Encoding]::UTF8)
-  $text = $text.Replace("$OldUser/$OldRepo", "$GitHubUser/$Repo")
-  $text = $text.Replace($OldRepo, $Repo)
+  $text = $text.Replace("$OldUser/$CurrentRepo", "$GitHubUser/$Repo")
+  $text = $text.Replace($CurrentRepo, $Repo)
   $text = $text.Replace($OldUser, $GitHubUser)
   [System.IO.File]::WriteAllText($path, $text, $Utf8NoBom)
 }

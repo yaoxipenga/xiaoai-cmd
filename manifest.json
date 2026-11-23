@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "description": "免唤醒、免麦克风：在页面输入文字，让小爱音箱像听到这句话一样执行指令（接听电话、暂停、关灯等）",
   "author": "yaoxipenga",
-  "homepage": "https://github.com/yaoxipenga/songloft-xiaoai-text-command",
+  "homepage": "https://github.com/yaoxipenga/xiaoai-cmd",
   "license": "MIT",
   "entryPath": "xiaoai-text-command",
-  "download_url": "https://raw.githubusercontent.com/yaoxipenga/songloft-xiaoai-text-command/main/xiaoai-text-command.jsplugin.zip",
+  "download_url": "https://raw.githubusercontent.com/yaoxipenga/xiaoai-cmd/main/xiaoai-text-command.jsplugin.zip",
   "entryHash": "978e73b3fc64220d0043b5124c453aec10ee48d76385533f1c6ae3cd705af264",
   "zipHash": "d31580c28950bfc3f770c05b7aa2e26965c91c93d620fcf3e06d56a4b7ba6337"
 }

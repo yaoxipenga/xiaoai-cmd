@@ -11,7 +11,7 @@
 把这个 URL 填进 Songloft「设置 → 导航与插件 → 提交插件源」即可：
 
 ```
-https://raw.githubusercontent.com/yaoxipenga/songloft-xiaoai-text-command/main/registry.json
+https://raw.githubusercontent.com/yaoxipenga/xiaoai-cmd/main/registry.json
 ```
 
 > 若你的 GitHub 用户名不是 `yaoxipenga`，或换了仓库名，先运行一次 `publish.ps1 -GitHubUser 你的用户名`（会自动替换全部 URL 并重算哈希），再把脚本输出的 URL 填进表单。
@@ -20,7 +20,7 @@ https://raw.githubusercontent.com/yaoxipenga/songloft-xiaoai-text-command/main/r
 
 ## 发布（只需一次）
 
-1. 在 GitHub 新建一个**公开、空**仓库，例如 `songloft-xiaoai-text-command`（不要勾选 README / .gitignore / License 初始化）。
+1. 在 GitHub 新建一个**公开、空**仓库，例如 `xiaoai-cmd`（不要勾选 README / .gitignore / License 初始化）。
 2. 在本目录执行：
 
    ```powershell
@@ -33,7 +33,7 @@ https://raw.githubusercontent.com/yaoxipenga/songloft-xiaoai-text-command/main/r
    ```bash
    git init && git add . && git commit -m "init plugin registry"
    git branch -M main
-   git remote add origin https://github.com/<用户名>/songloft-xiaoai-text-command.git
+   git remote add origin https://github.com/<用户名>/xiaoai-cmd.git
    git push -u origin main
    ```
 
@@ -81,7 +81,7 @@ Songloft 的 `songloft.storage` 按插件隔离，插件之间读不到彼此的
 ## 目录结构
 
 ```
-songloft-xiaoai-text-command/
+xiaoai-cmd/
 ├── registry.json          ← 插件源（表单要的 URL）
 ├── plugin.json            ← 插件元数据 + 双层哈希
 ├── manifest.json          ← 更新检查清单
