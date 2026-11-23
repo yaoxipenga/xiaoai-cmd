@@ -4,7 +4,7 @@
 
 | 项目 | 值 |
 | --- | --- |
-| 当前版本 | **2.0.0** |
+| 当前版本 | **2.0.2** |
 | 插件名称 / 标识 | `小爱文字指令` / `xiaoai-text-command` |
 | 宿主要求 | Songloft ≥ 2.9.5 |
 | 插件源地址 | <https://raw.githubusercontent.com/yaoxipenga/xiaoai-cmd/main/registry.json> |
@@ -27,7 +27,7 @@
 | --- | --- | --- |
 | 远程呼唤（文字模式） | `mibrain/text_to_speech`，把文字**朗读**出来 | 否 |
 | 小爱语音助手 | `/conversation/ws` **监听**小爱已经识别出的对话文本 | 否 |
-| **本插件** | 云端文本指令 `mibrain/ai_service` 或 MIoT `5-4` 动作 | **是** |
+| **本插件** | 默认云端文本指令 `mibrain/ai_service`；MIoT `5-4` 仅作实验通道 | **是** |
 
 ---
 
@@ -51,7 +51,7 @@ https://raw.githubusercontent.com/yaoxipenga/xiaoai-cmd/main/registry.json
 
 ---
 
-## 3. 界面与功能（2.0.0）
+## 3. 界面与功能（2.0.0 起）
 
 - **移动端 / App 优先**：指令文本框独占整行（最小 100px 高、16px 字号避免 iOS 聚焦缩放），「执行指令 / 仅播报」移到文本框下方独立一行；自动适配系统暗色、底部安全区、App 内置 WebView；360px 起的窄屏无横向溢出。
 - **自定义弹出选择器**：「目标音箱」「执行前」不再是系统原生单选框。手机端从底部滑出 Bottom Sheet，桌面端（≥640px）自动变居中对话框；支持点遮罩 / ✕ / 取消 / ESC 关闭，打开时锁定页面滚动。
@@ -90,11 +90,11 @@ Songloft 的 `songloft.storage` 按插件隔离，插件之间读不到彼此的
 
 ## 5. 指令是怎么执行的
 
-1. **MIoT `5-4` execute-text-directive**（主）：官方动作 `siid=5, aiid=4`，参数 `[文本, 静默标志]`，效果等同直接对小爱说出这句话。需要 `xiaomiio` 的 `serviceToken` + `ssecurity` 与设备 `miotDID`。
-2. **云端 `mibrain / ai_service`**（备）：`POST https://api2.mina.mi.com/remote/ubus`，`message = {tts:1, nlp:1, nlp_text:"…"}`。需要 `micoapi` 的 `serviceToken`；设备没有 `miotDID` 时自动走这条。
+1. **云端 `mibrain / ai_service`**（默认 / 主）：`POST https://api2.mina.mi.com/remote/ubus`，`message = {tts:1, nlp:1, nlp_text:"…"}`。需要 `micoapi` 的 `serviceToken`。这批机型（LX04 / LX01 / LX06 / S12A）实机验证能正常执行。**注意**：它是云端远程文本代理，只注入一次远程 NLP 会话；下发「接听电话」能接听、能播放下行声音，但麦克风上行没有交给通话模块，通话会变成单向。
+2. **MIoT `5-4` execute-text-directive**（实验，默认关闭）：官方动作 `siid=5, aiid=4`，参数 `[文本, 静默标志]`，语义上等同直接对小爱说出这句话。需要 `xiaomiio` 的 `serviceToken` + `ssecurity` 与设备 `miotDID`。**实机教训**：云端返回 `code=0` 只代表「已受理」，上述老机型设备实际并不执行动作；因此默认不调用，只有 `POST /command` 显式带 `channel:"miot"` 时才尝试。宿主的 `/mina/devices` 不返回 `miotDID`，插件仍会从米家云 `admin/v2/device_list` 补全并缓存 6 小时，仅供该实验通道使用。
 3. **宿主控制通道**（兜底）：停止播放、降低音量、TTS 播报，零凭据即可用。
 
-两条云端通道都会把 HTTP 状态与云端返回码逐条写入页面执行日志。
+云端通道会把 HTTP 状态与返回码逐条写入页面执行日志。**判断指令是否真的生效，要看设备端有没有反应，不能只看 `code=0`。**
 
 ---
 
@@ -106,12 +106,14 @@ Songloft 的 `songloft.storage` 按插件隔离，插件之间读不到彼此的
 | --- | --- | --- |
 | GET | `/health` | 登录态、凭据来源、可用通道自检 |
 | GET | `/devices` | 列出宿主已登录账号下的全部音箱 |
-| POST | `/command` | 下发指令；`say_only=true` 时仅播报 |
+| POST | `/command` | 下发指令；`say_only=true` 时仅播报，`channel="miot"` 时实验性走 5-4 |
 | GET / POST | `/config` | 读取 / 保存（或清空、导入）手动凭据 |
 | POST | `/redetect` | 重新同步宿主登录态 |
 | POST | `/test` | 凭据自检 |
 | GET | `/logs` | 读取执行日志 |
 | POST | `/logs/clear` | 清空执行日志 |
+
+`channel` 是 v2.0.2 新增的可选字段，只接受 `cloud`（默认，云端文字指令）与 `miot`（实验性 5-4）。日常使用不需要传，前端界面也不暴露该开关；页面总是按默认通道下发。
 
 ---
 
@@ -205,6 +207,14 @@ python build.py --sync-dev # 额外同步到 ./xiaoai-text-command.jsplugin/
 - 10 个视口（320 → 1280px）全元素几何扫描无新增溢出；与上一版做逐像素布局对照，主要控件位置一致。
 - `node --check` 语法通过，58 个 DOM id 引用零缺失。
 
+**后端（v2.0.1 / v2.0.2 实机，2026-11-23）**：同一套 Songloft 宿主 + 4 台音箱，重点验证通道选择。
+
+- 宿主的 `/mina/devices` 不返回 `miotDID`，但米家云 `admin/v2/device_list` 的原始返回里有（例如 LX06「鑫宝詹森之家」= `725764854`）。
+- **v2.0.1 的教训**：默认切到 MIoT 5-4 后，「关闭鱼缸」「音量调到 40」等指令云端全部 `HTTP 200 / code=0`，但音箱没有任何反应 —— `code=0` 只代表「已受理」，这批老机型并不执行该动作。
+- 传无效 DID 时 MIoT 返回 `code=-8 / get udid error=0`，可用来强制回退到云端通道做对照。
+- **v2.0.2 恢复验证**：默认回到 `mibrain/ai_service`；模拟页面真实请求（带 `miot_did`、不带 `channel`）返回 `channel=mibrain/ai_service`、`code=0`，执行日志中不再出现 5-4 步骤。
+- 通话单向问题**尚未解决**：通过云端文本代理下发「接听电话」能接听、下行有声，但音箱侧麦克风上行传不回；直接对音箱说「小爱同学，接听电话」则双向正常。
+
 ---
 
 ## 12. 已知限制
@@ -213,11 +223,24 @@ python build.py --sync-dev # 额外同步到 ./xiaoai-text-command.jsplugin/
 - 「接听 / 挂断电话」还要求音箱本身已绑定通话功能。
 - 网页语音识别在 **iOS Safari 与部分 App 内置 WebView 不可用**，会自动降级为键盘系统听写提示。
 - 设备在线状态完全依赖宿主 `/mina/devices` 返回的 `presence`；若宿主未提供该字段，会显示灰色「未知」而不是猜测。
-- 若两条云端通道都被拒，可勾选「执行前停止播放」并用「仅播报」提示，或在米家 App 里建立手动场景用小爱口令触发。
+- 若云端通道被拒，可勾选「执行前停止播放」并用「仅播报」提示，或在米家 App 里建立手动场景用小爱口令触发。
+- **MIoT 5-4 在老机型上不可用**：LX04 / LX01 / LX06 / S12A 会返回 `code=0` 却不执行动作，因此默认不启用；`channel:"miot"` 只供实验排查。
+- **「接听电话」会单向**：`mibrain/ai_service` 是云端远程文本代理，注入的是一次远程 NLP 会话，接听后只建立下行播放，麦克风上行不会交给通话模块。需要双向通话请直接对音箱说「小爱同学，接听电话」、按音箱顶部按键接听，或在米家 App 里开启自动接听。
 
 ---
 
 ## 13. 更新日志
+
+### v2.0.2（2026-11-23）
+
+- **回退修复**：v2.0.1 把默认通道切到 MIoT 5-4 后，老机型音箱对所有指令都没反应。现在默认恢复 `mibrain/ai_service`，5-4 降级为 `channel:"miot"` 实验参数，默认完全不调用、也不产生额外请求。
+- 新增从米家云 `admin/v2/device_list` 补全 `miotDID`（缓存 6 小时），只影响 `/devices` 返回字段，供实验通道使用。
+- 前端与既有 API 契约不变；`entryHash` / `zipHash` 已重算，`build.py --check` 校验通过。
+- 文档补齐通道选择、实机验证记录，以及「接听电话单向」「`code=0` ≠ 设备执行」两条已知限制。
+
+### v2.0.1（2026-11-23）· 未发布，已废弃
+
+- 曾尝试自动补全 `miotDID` 并默认走 MIoT 5-4，期望解决「接听电话单向」。实机发现这些机型只受理不执行，导致所有指令失效，已在 v2.0.2 回退。**请勿使用该版本。**
 
 ### v2.0.0（2026-11-23）
 

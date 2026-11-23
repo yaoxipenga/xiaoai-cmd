@@ -1,12 +1,12 @@
 {
   "name": "小爱文字指令",
-  "version": "2.0.0",
-  "description": "免唤醒、免麦克风：输入或语音说出一句话，让小爱音箱像听到这句话一样执行指令；移动端 / App 专属界面、自定义弹出选择器与设备在线状态",
+  "version": "2.0.2",
+  "description": "免唤醒、免麦克风：输入或语音说出一句话，让小爱音箱像听到这句话一样执行指令；移动端 / App 专属界面、自定义弹出选择器与设备在线状态；默认云端文字指令通道，5-4 仅实验",
   "author": "yaoxipenga",
   "homepage": "https://github.com/yaoxipenga/xiaoai-cmd",
   "license": "MIT",
   "entryPath": "xiaoai-text-command",
   "download_url": "https://raw.githubusercontent.com/yaoxipenga/xiaoai-cmd/main/xiaoai-text-command.jsplugin.zip",
-  "entryHash": "d53aff9e9df6795bcb9a52734713e0cdb04b5e76eebc9ad6108937435bc2a095",
-  "zipHash": "4de2ebfe8a0e0387a8aeb53506c6a257f0cc0eb9f10f2406047f85e949da10af"
+  "entryHash": "c44b29861ecac50fa988592efaaf1e0c91d00686fa0a877adf060c3564792580",
+  "zipHash": "d0b76bc59167acf1e95f1c9155e91f98481b094083349224fcda6ea576d58cde"
 }

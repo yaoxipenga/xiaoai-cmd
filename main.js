@@ -28,6 +28,13 @@ var UA = "Android-7.1.1-1.0.0-ONEPLUS A3010-136-XTCAPP01 APP/xiaomi.smarthome AP
 var MIIO_UA = "MICO/AndroidApp/@SHIP.TO.2A2FE0D7@/2.4.40";
 var HOST_API = "/api/v1/jsplugin/miot";
 var PASSPORT_DEVICE_ID = "XTCAPP01DEVICE01";
+// 宿主 /mina/devices 不返回 miotDID，而 MIoT 5-4 必须有它；
+// 缺了 DID 会全部降级到 mibrain/ai_service（云端文本代理），
+// 该通道只注入一次远程 NLP 会话，通话等需要本地麦克风的技能会变成单向。
+// 因此额外从米家云原始设备列表补全，并缓存 6 小时。
+var MINA_DEVICE_LIST_URL = "https://api2.mina.mi.com/admin/v2/device_list";
+var DID_CACHE_KEY = "xtc_miot_dids_v1";
+var DID_TTL_MS = 6 * 60 * 60 * 1000;
 
 // ---------- 基础工具 ----------
 
@@ -453,6 +460,58 @@ async function hostRequest(method, path, payload) {
   };
 }
 
+/**
+ * 从米家云原始设备列表取 deviceID → miotDID 映射。
+ * GET https://api2.mina.mi.com/admin/v2/device_list?master=1&requestId=...
+ * 返回 { code:0, data:[{ deviceID, miotDID, ... }] }，字段在宿主 /mina/devices 里被丢掉了。
+ * 只使用插件已复用的 micoapi serviceToken，不额外索取凭据。
+ */
+async function fetchMiotDidMap() {
+  var cached = asObject(await storageGet(DID_CACHE_KEY));
+  var oldMap = cached && cached.map ? cached.map : {};
+  if (cached && cached.ts && (Date.now() - Number(cached.ts) < DID_TTL_MS) && cached.map) {
+    return cached.map;
+  }
+
+  var auth = await resolveAuth();
+  if (!auth.can_ubus) return oldMap;
+  var svc = auth.primary;
+  var url = MINA_DEVICE_LIST_URL + "?master=1&requestId=" + encodeURIComponent("app_ios_" + randId(30));
+  var cookie = "userId=" + svc.user_id + ";serviceToken=" + svc.micoapi_token + ";channel=MI_APP_STORE";
+
+  try {
+    var resp = await fetch(url, {
+      method: "GET",
+      headers: {
+        "User-Agent": UA,
+        "Cookie": cookie,
+        "X-Fetch-Timeout-Ms": "8000"
+      }
+    });
+    var t = resp.text();
+    if (t && typeof t.then === "function") t = await t;
+    var j = JSON.parse(String(t || ""));
+    var raw = j && j.data;
+    var list = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.devices) ? raw.devices : []);
+    var map = {};
+    var count = 0;
+    for (var i = 0; i < list.length; i++) {
+      var d = list[i] || {};
+      var id = String(d.deviceID || d.deviceId || d.device_id || "");
+      var did = String(d.miotDID || d.miot_did || d.did || "");
+      if (id && did) { map[id] = did; count++; }
+    }
+    if (count > 0) {
+      await storageSet(DID_CACHE_KEY, { ts: Date.now(), map: map });
+      try { songloft.log.info("[文字指令] 已补全 " + count + " 台音箱的 miotDID"); } catch (e) {}
+      return map;
+    }
+  } catch (e) {
+    try { songloft.log.warn("[文字指令] 补全 miotDID 失败: " + String(e)); } catch (e2) {}
+  }
+  return oldMap;
+}
+
 /** 设备列表：与另外两个插件完全相同的来源，打开即可看到所有音箱 */
 async function fetchDevices() {
   var r = await hostRequest("GET", "/mina/devices", null);
@@ -474,6 +533,21 @@ async function fetchDevices() {
         managed: d.managed !== false
       });
     }
+  }
+  // 宿主丢掉了 miotDID，补全后页面才会把 DID 带到 /command，从而走 MIoT 5-4
+  var needDid = false;
+  for (var n = 0; n < out.length; n++) {
+    if (!out[n].miot_did) { needDid = true; break; }
+  }
+  if (needDid) {
+    try {
+      var didMap = await fetchMiotDidMap();
+      for (var q = 0; q < out.length; q++) {
+        if (!out[q].miot_did && didMap[out[q].device_id]) {
+          out[q].miot_did = didMap[out[q].device_id];
+        }
+      }
+    } catch (e) { /* 补全失败不影响原有设备列表 */ }
   }
   return { success: r.ok, devices: out, raw: r.ok ? "" : r.raw, status: r.status };
 }
@@ -652,12 +726,29 @@ async function runCommand(req) {
   var silent = !!b.silent;
   var preAction = String(b.pre_action || "none");
   var sayOnly = !!b.say_only;
+  // cloud = 云端文字指令（默认，实机验证可用）；miot = 实验性 5-4，仅排查时用。
+  var channelPref = String(b.channel || "cloud").trim();
 
   if (!text) return json({ success: false, error: "指令内容不能为空", steps: [] }, 400);
   if (!deviceId) return json({ success: false, error: "请先在页面选择一台音箱", steps: [] }, 400);
 
   var steps = [];
   var stamp = nowStr();
+
+  // 兜底：仅在实验性 channel=miot 时补全 DID；默认通道保持零额外请求。
+  if (channelPref === "miot" && !miotDid && deviceId) {
+    try {
+      var fallbackDidMap = await fetchMiotDidMap();
+      miotDid = String(fallbackDidMap[deviceId] || "");
+      if (miotDid) {
+        steps.push({
+          channel: "设备 miotDID 补全",
+          ok: true,
+          detail: "已从米家云设备列表补全 " + miotDid + "，本条指令改走 MIoT 5-4（等同本地语音）"
+        });
+      }
+    } catch (e) { /* 补全失败则保持原有通道选择 */ }
+  }
 
   // 1) 前置动作：音乐太吵时先停播 / 降音量（宿主通道，零配置）
   if (preAction === "stop" || preAction === "quiet") {
@@ -709,8 +800,11 @@ async function runCommand(req) {
   var usedChannel = "none";
   var lastDetail = "";
 
-  // 4) 主通道：MIoT 5-4 execute-text-directive（官方文本指令动作）
-  if (auth.can_miot) {
+  // 4) 实验通道：MIoT 5-4 execute-text-directive
+  //    v2.0.1 实机反馈：LX04 / LX01 / LX06 / S12A 对 5-4 返回 code=0（云端已受理），
+  //    但设备并不执行动作 —— 「受理」不等于「执行」。因此默认关闭，
+  //    只有显式传 channel=miot 时才尝试，日常下发一律走云端文字指令。
+  if (channelPref === "miot" && auth.can_miot) {
     try {
       var mr = await miotExec(auth, miotDid, text, silent);
       steps.push({ channel: "MIoT 5-4 执行文本指令", ok: mr.ok, detail: mr.detail });
@@ -719,15 +813,9 @@ async function runCommand(req) {
     } catch (e) {
       steps.push({ channel: "MIoT 5-4 执行文本指令", ok: false, detail: "异常：" + String(e) });
     }
-  } else {
-    steps.push({
-      channel: "MIoT 5-4 执行文本指令",
-      ok: false,
-      detail: !miotDid ? "设备缺少 miotDID，跳过" : "账号缺少 xiaomiio ssecurity，跳过"
-    });
   }
 
-  // 5) 备用通道：云端 mibrain / ai_service
+  // 5) 默认通道：云端 mibrain / ai_service（实机验证这批机型可正常执行）
   if (!success && auth.can_ubus) {
     var variants = [
       { label: "云端文字指令 mibrain/ai_service", message: { tts: silent ? 0 : 1, nlp: 1, nlp_text: text } },
