@@ -4,11 +4,12 @@
  *
  * 设计原则：与官方「远程呼唤 / 语音助手」插件一致，打开即用、零配置。
  *
- * 【凭据复用】
- *   Songloft 的 songloft.storage 按 entryPath 隔离，插件之间读不到彼此的账号；
- *   但 command.exec 的工作目录固定为 data/jsplugins_data/{entryPath}/，
- *   因此可以读取 ../miot/data/accounts —— 也就是「智能音箱」插件已登录的小米账号。
- *   每次执行都重新读取，这样 miot 插件自动刷新 serviceToken 后本插件能立即用上。
+ * 【凭据复用】零配置，与「远程呼唤」一样打开即用。
+ *   主通道：宿主跨插件路由 GET /api/v1/jsplugin/miot/accounts 拿到已登录账号的
+ *   passToken（官方接口只对 service_token / ssecurity 脱敏，passToken 完整返回），
+ *   再用官方 MinaAuth 同构的 serviceLogin 流程向 account.xiaomi.com 换取
+ *   micoapi / xiaomiio 的 serviceToken，缓存 30 分钟，过期自动重换。
+ *   兼容通道：command.exec 读取 ../miot/data/accounts；共享 storage；手动导入。
  *   凭据只留在本机内存 / 本插件存储，不会发往任何第三方，只用于小米云 API。
  *
  * 【执行通道，按可靠性排序】
@@ -216,22 +217,154 @@ function normalizeAccounts(raw) {
   return out;
 }
 
-/** 自动发现（每次执行都重新读，保证拿到 miot 刷新后的新 token） */
+var TOKEN_CACHE_KEY = "xtc_token_cache_v1";
+var TOKEN_TTL_MS = 30 * 60 * 1000;
+
+/** 宿主「智能音箱」插件的 /accounts 接口：passToken 未脱敏，可直接拿来换 serviceToken */
+async function readHostAccounts() {
+  try {
+    var r = await hostRequest("GET", "/accounts", null);
+    if (!r.ok || !r.data) return [];
+    var list = r.data.data || r.data.accounts || r.data;
+    return Array.isArray(list) ? list : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function headerSetCookies(headers) {
+  if (!headers) return [];
+  try {
+    if (typeof headers.getSetCookie === "function") {
+      var a = headers.getSetCookie();
+      if (a && a.length) return a;
+    }
+  } catch (e) {}
+  try {
+    var v = typeof headers.get === "function" ? headers.get("Set-Cookie") : "";
+    if (v) return [v];
+  } catch (e) {}
+  return [];
+}
+
+function cookieValue(headers, name) {
+  var list = headerSetCookies(headers);
+  for (var i = 0; i < list.length; i++) {
+    var parts = String(list[i]).split(";");
+    for (var j = 0; j < parts.length; j++) {
+      var p = parts[j].trim();
+      var k = p.indexOf("=");
+      if (k > 0 && p.slice(0, k).trim() === name) return p.slice(k + 1).trim();
+    }
+  }
+  return "";
+}
+
+async function fetchRaw(url, headers) {
+  var resp = await fetch(url, { method: "GET", headers: headers });
+  var t = resp.text();
+  if (t && typeof t.then === "function") t = await t;
+  return { status: resp.status, headers: resp.headers, text: String(t || "") };
+}
+
+/**
+ * passToken → serviceToken，与官方 MinaAuth.exchangeServiceToken 同构（已实机验证）：
+ *   GET /pass/serviceLogin?sid=<sid>&_json=true  （Cookie 带 passToken / userId / deviceId）
+ *   → location、ssecurity、nonce
+ *   clientSign = base64(sha1("nonce=<nonce>&<ssecurity>"))
+ *   GET location + _userIdNeedEncrypt=true + clientSign
+ *   → 响应 Set-Cookie 里的 serviceToken
+ */
+async function exchangeServiceToken(passToken, userId, sid) {
+  var dev = randId(16);
+  var ua = "Android-7.1.1-1.0.0-ONEPLUS A3010-136-" + dev + " APP/xiaomi.smarthome APPV/62830";
+  var cookie = "passToken=" + passToken + ";userId=" + userId + ";deviceId=" + dev + ";sdkVersion=3.8.6";
+  var common = { "User-Agent": ua, "Cookie": cookie, "X-Fetch-No-Redirect": "1" };
+
+  var r1 = await fetchRaw("https://account.xiaomi.com/pass/serviceLogin?sid=" + sid + "&_json=true", common);
+  var raw = r1.text.replace(/&&&START&&&/g, "").trim();
+  var d = asObject(raw);
+  if (!d || String(d.code || "0") !== "0" || !d.location) return null;
+
+  var ssec = String(d.ssecurity || "");
+  var nm = raw.match(/"nonce"\s*:\s*(\d+)/);
+  var nonce = nm ? nm[1] : String(d.nonce || "");
+  var sign;
+  try { sign = hexToB64(sha1Hex("nonce=" + nonce + "&" + ssec)); } catch (e) { return null; }
+
+  var loc = String(d.location);
+  var url = loc + (loc.indexOf("?") >= 0 ? "&" : "?") +
+    "_userIdNeedEncrypt=true&clientSign=" + encodeURIComponent(sign);
+  var r2 = await fetchRaw(url, common);
+  var st = cookieValue(r2.headers, "serviceToken");
+  if (!st) return null;
+  return { service_token: st, ssecurity: ssec || cookieValue(r2.headers, "ssecurity") };
+}
+
+/** 自动发现：宿主 API + passToken 换取为主通道，带 30 分钟缓存 */
 async function autoDiscover() {
-  var raw = await readMiotAccounts();
-  if (!raw) raw = await readMiotAccountsViaHostFile();
-  var accounts = normalizeAccounts(raw);
-  if (accounts.length > 0) return accounts;
+  try {
+    var list = await readHostAccounts();
+    if (list.length > 0) {
+      var cache = asObject(await storageGet(TOKEN_CACHE_KEY)) || {};
+      var out = [];
+      var changed = false;
+      for (var i = 0; i < list.length; i++) {
+        var a = list[i] || {};
+        var uid = String(a.user_id || a.userId || a.id || "").trim();
+        var pt = String(a.pass_token || a.passToken || "").trim();
+        if (!uid || !pt) continue;
+
+        var ck = cache[uid];
+        var fresh = ck && ck.ts && (Date.now() - Number(ck.ts) < TOKEN_TTL_MS) && ck.mico;
+        if (!fresh) {
+          var mico = null, io = null;
+          try { mico = await exchangeServiceToken(pt, uid, "micoapi"); } catch (e) {}
+          try { io = await exchangeServiceToken(pt, uid, "xiaomiio"); } catch (e) {}
+          if (mico && mico.service_token) {
+            ck = {
+              ts: Date.now(),
+              mico: mico.service_token,
+              io: (io && io.service_token) || mico.service_token,
+              ssec: (io && io.ssecurity) || mico.ssecurity || ""
+            };
+            cache[uid] = ck;
+            changed = true;
+          }
+        }
+        if (ck && ck.mico) {
+          out.push({
+            account_id: String(a.id || a.account || uid || ""),
+            user_id: uid,
+            micoapi_token: ck.mico,
+            xiaomiio_token: ck.io || ck.mico,
+            ssecurity: ck.ssec || "",
+            device_id: PASSPORT_DEVICE_ID
+          });
+        }
+      }
+      if (changed) await storageSet(TOKEN_CACHE_KEY, JSON.stringify(cache));
+      if (out.length > 0) return out;
+    }
+  } catch (e) {}
+
+  // 兼容旧宿主：读取 miot 落盘的 accounts 文件（command 权限可用时）
+  try {
+    var raw = await readMiotAccounts();
+    if (!raw) raw = await readMiotAccountsViaHostFile();
+    var accounts = normalizeAccounts(raw);
+    if (accounts.length > 0) return accounts;
+  } catch (e) {}
 
   // 兜底：老版本宿主把账号放在共享 storage（通常为空，保留兼容）
   try {
     var keys = await songloft.storage.keys();
     if (Array.isArray(keys)) {
-      for (var i = 0; i < keys.length; i++) {
-        var k = String(keys[i] || "");
-        if (k.indexOf("xtc_") === 0) continue;
-        if (!/account|token|mina|mico/i.test(k)) continue;
-        var acc = normalizeAccounts(asObject(await storageGet(k)));
+      for (var k = 0; k < keys.length; k++) {
+        var key = String(keys[k] || "");
+        if (key.indexOf("xtc_") === 0) continue;
+        if (!/account|token|mina|mico/i.test(key)) continue;
+        var acc = normalizeAccounts(asObject(await storageGet(key)));
         if (acc.length > 0) return acc;
       }
     }
@@ -281,7 +414,10 @@ async function resolveAuth() {
     if (primary.user_id) parts.push("userId=" + primary.user_id);
     parts.push("serviceToken=" + primary.micoapi_token);
     parts.push("channel=MI_APP_STORE");
-    micoCookie = String(cfg.cookie || "").trim() || parts.join("; ");
+    // 自动复用的凭据始终用最新 serviceToken 组装，避免被旧的手工 Cookie 覆盖
+    micoCookie = (source === "manual" || source === "cookie")
+      ? (String(cfg.cookie || "").trim() || parts.join("; "))
+      : parts.join("; ");
   }
 
   return {

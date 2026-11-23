@@ -45,18 +45,20 @@ ZIP 通过仓库内 raw 地址分发（`download_url` 指向仓库根目录的 `
 
 ## 为什么可以「打开即用、不用再登录」
 
-Songloft 的 `songloft.storage` 按插件隔离，插件之间读不到彼此的账号；但插件可以调用宿主**「智能音箱」插件**的 HTTP 路由：
+Songloft 的 `songloft.storage` 按插件隔离，插件之间读不到彼此的账号；但插件可以调用宿主「智能音箱」插件的 HTTP 路由，并用它返回的 `passToken` 换取自己的 `serviceToken`：
 
 | 能力 | 通道 | 是否需要额外登录 |
 | --- | --- | --- |
 | 设备列表（所有音箱） | `/api/v1/jsplugin/miot/mina/devices` | 否 |
 | 执行前停止播放 / 调音量 / 播报 | `/api/v1/jsplugin/miot/mina/*` | 否 |
-| 云端文本指令所需的小米账号凭据 | 本机读取 `jsplugins_data/miot/data/accounts` | 否，自动复用 |
+| 已登录小米账号的 `passToken` | `/api/v1/jsplugin/miot/accounts` | 否，自动复用 |
+| `micoapi` / `xiaomiio` 的 `serviceToken` | 用 `passToken` 走官方 `serviceLogin` 流程向 `account.xiaomi.com` 换取 | 否，自动完成 |
 
-每次下发指令都会**重新读取**该账号文件，因此官方插件自动刷新 `serviceToken` 后，本插件无需任何操作即可继续工作。
+官方 `/accounts` 接口只对 `service_token` / `ssecurity` 脱敏，`passToken` 是完整返回的。换取流程与官方 `MinaAuth.exchangeServiceToken` 同构：`serviceLogin` → `clientSign = base64(sha1("nonce=<nonce>&<ssecurity>"))` → 从 STS 响应的 `Set-Cookie` 取 `serviceToken`。换到的 token 缓存 30 分钟，过期自动重换；官方插件重新登录后也会自动同步，无需任何操作。
 
-> 读取范围仅限本机 Songloft 数据目录下「智能音箱」插件自己的账号文件；凭据只保存在本机、只用于调用小米云 API，不会上传到任何第三方服务器。这也是 `plugin.json` 声明 `command` 权限的唯一用途（调用 `songloft.command.exec` 读取本机文件）。
-> 若宿主限制了文件读取，插件会提示「自动复用未生效」，此时可在页面「高级设置」里粘贴一次同一个账号文件，功能不受影响。
+兼容通道（仅主通道不可用时才会走到）：`command.exec` 读取 `jsplugins_data/miot/data/accounts`、共享 storage 扫描、页面「高级设置」手动导入。
+
+> 凭据只留在本机内存 / 本插件 storage，只用于调用小米云 API 与小米账号服务器，不会发往任何第三方。`command` 权限仅用于上述兼容兜底读取本机文件。
 
 ## 指令执行通道
 
@@ -73,6 +75,10 @@ Songloft 的 `songloft.storage` 按插件隔离，插件之间读不到彼此的
 - 不同机型 / 固件对文本指令动作的开放程度不一致，老款（如小爱音箱 mini）可能返回非 0 错误码。
 - 「接听 / 挂断电话」还要求音箱本身已绑定通话功能。
 - 若两条云端通道都被拒，可勾选「执行前停止播放」并用「仅播报」提示，或在米家 App 里建立手动场景用小爱口令触发。
+
+## v1.1.0 修复（2026-11-23）
+
+早期版本假设官方插件把账号写在 `jsplugins_data/miot/data/accounts` 并只读取这一个文件。部分宿主（含本实例）该路径读不到文件，而 `/accounts` 又把 `serviceToken` 脱敏，导致页面提示「未能自动读取登录态」。v1.1.0 改为以宿主 `/accounts` + `passToken` 换取为主通道，不依赖文件读取，已在真实实例上验证通过。
 
 ## 更新插件
 
