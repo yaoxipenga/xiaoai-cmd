@@ -1,0 +1,6 @@
+{
+  "name": "小爱文字指令插件源",
+  "plugins": [
+    "https://raw.githubusercontent.com/yaoxipenga/songloft-xiaoai-text-command/main/plugin.json"
+  ]
+}

@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>小爱文字指令</title>
+<style>
+  :root{
+    --blue:#1677ff; --blue-soft:#eaf2ff; --blue-dark:#0b5fd9;
+    --line:#e6e9f0; --text:#1f2430; --muted:#7b8494; --bg:#f6f8fc;
+    --ok:#18a058; --warn:#e8912d; --err:#e5484d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:24px;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:14px;line-height:1.6}
+  .wrap{max-width:960px;margin:0 auto}
+  .head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+  .head h1{font-size:20px;margin:0;font-weight:650}
+  .head .sub{color:var(--muted);font-size:13px;margin-top:2px}
+  .badge{margin-left:auto;font-size:12px;padding:5px 11px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--muted)}
+  .badge.ok{color:var(--ok);border-color:#b7e4c8;background:#f0fbf4}
+  .badge.bad{color:var(--err);border-color:#f5c2c4;background:#fff5f5}
+  .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:16px;
+    box-shadow:0 1px 2px rgba(20,40,80,.03)}
+  .card h2{font-size:15px;margin:0 0 4px;font-weight:650;display:flex;align-items:center;gap:8px}
+  .card .desc{color:var(--muted);font-size:12.5px;margin:0 0 16px}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .grow{flex:1;min-width:180px}
+  label.lb{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px}
+  select,input[type=text],input[type=password],textarea{
+    width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:#fff;
+    color:var(--text);font-size:14px;outline:none;font-family:inherit}
+  select:focus,input:focus,textarea:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(22,119,255,.10)}
+  textarea{resize:vertical;min-height:44px;line-height:1.5}
+  button{font-family:inherit;font-size:13.5px;cursor:pointer;border-radius:9px;padding:9px 16px;
+    border:1px solid var(--blue);background:var(--blue);color:#fff;transition:.15s}
+  button:hover{background:var(--blue-dark);border-color:var(--blue-dark)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  button.ghost{background:#fff;color:var(--blue);border-color:#bcd4ff}
+  button.ghost:hover{background:var(--blue-soft)}
+  button.plain{background:#fff;color:var(--text);border-color:var(--line)}
+  button.plain:hover{background:#f4f6fa;border-color:#cfd6e4}
+  button.big{padding:10px 26px;font-size:14px;font-weight:600}
+  .inputline{display:flex;gap:10px;align-items:flex-start;margin-top:16px}
+  .inputline textarea{flex:1}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .chip{font-size:12.5px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);
+    background:#fff;color:var(--text);cursor:pointer}
+  .chip:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-soft)}
+  .opts{display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-top:14px;
+    padding-top:14px;border-top:1px dashed var(--line);color:var(--muted);font-size:13px}
+  .opts label{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+  .opts select{width:auto;min-width:150px;padding:6px 10px;font-size:13px}
+  .console{background:#1e2430;color:#d7dde8;border-radius:10px;padding:14px 16px;
+    font:12.5px/1.75 ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
+    min-height:120px;max-height:300px;overflow:auto;white-space:pre-wrap;word-break:break-all}
+  .console .g{color:#7ee2a8}.console .r{color:#ff9b9b}.console .y{color:#ffd479}.console .b{color:#8ab4ff}.console .d{color:#8a94a6}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:680px){.grid2{grid-template-columns:1fr}}
+  .hint{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.7}
+  .hint code{background:#f2f4f8;padding:1px 5px;border-radius:4px;font-size:11.5px}
+  .notice{border-left:3px solid var(--blue);background:var(--blue-soft);padding:10px 13px;
+    border-radius:0 8px 8px 0;font-size:12.5px;color:#35507e;margin-top:12px}
+  .notice.warn{border-left-color:var(--warn);background:#fff7ec;color:#8a5a17}
+  .reuse{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px;
+    background:#f0fbf4;border:1px solid #c9ecd8;color:#1d6b43;font-size:13px;margin-bottom:16px}
+  .reuse.bad{background:#fff5f5;border-color:#f5c2c4;color:#a83236}
+  .reuse b{font-weight:650}
+  details.adv{border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin-top:12px;background:#fcfdff}
+  details.adv summary{cursor:pointer;color:var(--blue);font-size:13px;font-weight:600;list-style:none}
+  details.adv summary::-webkit-details-marker{display:none}
+  details.adv summary::before{content:'▸ ';font-size:12px}
+  details.adv[open] summary::before{content:'▾ '}
+  details.adv .body{margin-top:14px}
+  .kv{font-size:12.5px;color:var(--muted)}
+  .foot{text-align:center;color:var(--muted);font-size:12px;padding:6px 0 20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="head">
+    <div>
+      <h1>⌨️ 小爱文字指令</h1>
+      <div class="sub">不用喊「小爱同学」，输入一句话，让音箱像听到这句话一样执行</div>
+    </div>
+    <span id="statusBadge" class="badge">正在检测…</span>
+  </div>
+
+  <!-- 控制栏 -->
+  <div class="card">
+    <div class="reuse" id="reuseBar">
+      <span>🔗</span>
+      <div><b>正在复用「智能音箱」插件的登录态…</b><br><span id="reuseDetail" style="font-size:12px">设备列表与登录凭据都直接取自已装好的官方插件，无需再次登录。</span></div>
+    </div>
+
+    <h2>🎯 指令控制栏</h2>
+    <p class="desc">输入例如「接听电话」「暂停播放」「把音量调到 20」「关闭客厅灯」，回车或点执行即可。</p>
+
+    <div class="row">
+      <div class="grow">
+        <label class="lb">目标音箱</label>
+        <select id="deviceSel"><option value="">正在读取设备列表…</option></select>
+      </div>
+      <div style="padding-top:22px"><button class="plain" id="btnRefreshDev">刷新设备</button></div>
+    </div>
+
+    <div class="inputline">
+      <textarea id="cmdInput" rows="1" placeholder="在这里输入要下发的指令，例如：接听电话"></textarea>
+      <button class="big" id="btnRun">执行指令</button>
+      <button class="ghost" id="btnSay" title="只朗读文字，不执行指令">仅播报</button>
+    </div>
+
+    <div class="chips" id="chips"></div>
+
+    <div class="opts">
+      <label><input type="checkbox" id="optSilent"> 静默执行（不让音箱出声回应）</label>
+      <label>执行前
+        <select id="optPre">
+          <option value="none">不做处理</option>
+          <option value="stop">停止当前播放（推荐）</option>
+          <option value="quiet">把音量调低到 10%</option>
+        </select>
+      </label>
+      <span class="kv">音乐很吵时先停播，指令成功率更高</span>
+    </div>
+
+    <div id="resultNotice"></div>
+  </div>
+
+  <!-- 执行日志 -->
+  <div class="card">
+    <h2>📋 后端执行日志 <span style="font-weight:400;color:var(--muted);font-size:12px">逐通道下发结果</span></h2>
+    <p class="desc">每一步调用的通道、云端返回码都会记录在这里，方便判断是凭据问题还是机型不支持。</p>
+    <div class="console" id="console"><span class="d">等待指令…</span></div>
+    <div class="row" style="margin-top:12px">
+      <button class="plain" id="btnLoadLogs">刷新日志</button>
+      <button class="plain" id="btnClearLogs">清空日志</button>
+    </div>
+  </div>
+
+  <!-- 高级设置：默认折叠 -->
+  <div class="card">
+    <h2>⚙️ 登录态与高级设置</h2>
+    <p class="desc">正常情况下这里<b>不需要任何操作</b>：插件会自动读取本机「智能音箱」插件已登录的小米账号，与另外两个插件一样打开即用。</p>
+
+    <div class="row">
+      <button class="ghost" id="btnRedetect">重新同步登录态</button>
+      <button class="plain" id="btnTest">凭据自检</button>
+      <span class="kv" id="redetectResult">尚未同步</span>
+    </div>
+
+    <details class="adv" id="advBox">
+      <summary>手动导入凭据（仅自动复用失败时才需要）</summary>
+      <div class="body">
+        <div class="hint" style="margin-top:0">
+          如果上面的状态显示「未能自动读取」，可粘贴本机 <code>&lt;Songloft 数据目录&gt;/jsplugins_data/miot/data/accounts</code>
+          文件内容，或米家网页复制的完整 Cookie，点「识别并保存」即可。凭据只保存在本机，不会外发。
+        </div>
+        <div style="margin-top:12px;padding:13px;background:#f8faff;border:1px dashed #c9dcff;border-radius:10px">
+          <label class="lb">粘贴导入</label>
+          <textarea id="cfgImport" rows="2" placeholder="粘贴 accounts 文件全部内容，或完整 Cookie"></textarea>
+          <div class="row" style="margin-top:8px">
+            <button class="ghost" id="btnImport">识别并保存</button>
+            <span class="kv" id="importStatus"></span>
+          </div>
+        </div>
+
+        <div class="lb" style="margin-top:16px">或手动填写</div>
+        <div class="grid2" style="margin-top:8px">
+          <div><label class="lb">userId（小米账号 ID）</label><input type="text" id="cfgUserId" placeholder="例如 123456789"></div>
+          <div><label class="lb">micoapi serviceToken</label><input type="password" id="cfgToken" placeholder="从米家网页 Cookie 中复制"></div>
+        </div>
+        <div class="grid2" style="margin-top:10px">
+          <div><label class="lb">xiaomiio ssecurity（可选，MIoT 5-4 用）</label><input type="password" id="cfgSsec" placeholder="accounts 文件里的 ssecurity"></div>
+          <div><label class="lb">完整 Cookie（可选，优先级更高）</label><input type="text" id="cfgCookie" placeholder="userId=xxx; serviceToken=xxx; …"></div>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <button id="btnSaveCfg">保存凭据</button>
+          <button class="plain" id="btnClearCfg">清空手动凭据</button>
+          <span class="kv" id="cfgStatus"></span>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <!-- 原理说明 -->
+  <div class="card">
+    <h2>💡 原理与已知限制</h2>
+    <div class="hint" style="font-size:12.5px">
+      <b>和现有两个插件的区别：</b>「远程呼唤」的文字模式走 <code>mibrain/text_to_speech</code>，只是让音箱<b>朗读</b>文字；
+      「小爱语音助手」是在<b>监听</b>小爱已识别出来的对话文本。两者都不会让小爱<b>执行</b>一条新指令。<br><br>
+      <b>本插件的执行通道：</b>优先走 MIoT 官方动作 <code>5-4 execute-text-directive</code>（<code>siid=5, aiid=4</code>），
+      效果等同直接对小爱说出这句话，还能勾选静默执行；若设备没有 miotDID 或该动作被拒，再回退到云端
+      <code>mibrain/ai_service</code>（<code>{tts:1, nlp:1, nlp_text:"…"}</code>）。两条都不需要麦克风、不需要喊唤醒词。<br><br>
+      <b>凭据复用：</b>设备列表、停止播放、音量、播报都通过宿主 <code>/api/v1/jsplugin/miot/*</code> 复用官方插件的登录态；
+      云端两条指令通道所需的小米账号凭据，则由本插件在本机读取「智能音箱」插件已保存的账号文件自动复用 ——
+      <b>每次执行都会重新读取</b>，因此官方插件自动刷新 token 后无需在这里做任何操作。<br><br>
+      <b>限制：</b>不同机型 / 固件对文本指令动作的开放程度不一致，老款（如小爱音箱 mini）可能返回非 0 错误码；
+      「接听 / 挂断电话」还取决于音箱本身是否绑定通话功能。日志会逐条记录 HTTP 状态与云端返回码，装上试一次即可确认。
+    </div>
+    <div class="notice warn" style="margin-top:14px">
+      若两条云端通道在您的机型上都被拒绝，可勾选「执行前停止播放」+ 用「仅播报」让音箱提示一句，再正常语音下达指令；
+      或在米家 App 里为该音箱建立「手动场景」并用小爱口令触发。
+    </div>
+  </div>
+
+  <div class="foot">小爱文字指令 · 本地插件 · 仅与你自己的 Songloft 和小米云通信</div>
+</div>
+
+<script>
+(function(){
+  var BASE = '/api/v1/jsplugin/xiaoai-text-command';
+  var PLUGIN = window.SongloftPlugin || {};
+  var getAuthToken = PLUGIN.getAuthToken || function(){ return ''; };
+  var announce = PLUGIN.announce || function(){};
+
+  var $ = function(id){ return document.getElementById(id); };
+  var consoleEl = $('console');
+  var selected = { account_id:'', device_id:'', miot_did:'' };
+
+  var QUICK = ['接听电话','挂断电话','暂停播放','停止播放','下一首','音量调到 20','打开客厅灯','关闭客厅灯','现在几点','今天天气怎么样'];
+
+  function esc(s){
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
+    });
+  }
+
+  function logLine(cls, time, text){
+    var div = document.createElement('div');
+    div.innerHTML = '<span class="d">' + esc(time || '') + '</span> <span class="' + cls + '">' + esc(text) + '</span>';
+    consoleEl.appendChild(div);
+    consoleEl.scrollTop = consoleEl.scrollHeight;
+  }
+
+  function now(){
+    var d = new Date(), p = function(x){ return x < 10 ? '0'+x : String(x); };
+    return p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+  }
+
+  async function api(path, method, body){
+    var headers = {'Content-Type':'application/json'};
+    var token = getAuthToken();
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    var opt = {method: method || 'GET', headers: headers};
+    if (body) opt.body = JSON.stringify(body);
+    var res = await fetch(BASE + path, opt);
+    var data = null;
+    try { data = await res.json(); } catch(e) {}
+    if (!res.ok) throw new Error((data && (data.error || data.detail)) || ('HTTP ' + res.status));
+    return data || {};
+  }
+
+  function setBadge(state, text){
+    var el = $('statusBadge');
+    el.className = 'badge' + (state ? ' ' + state : '');
+    el.textContent = text;
+  }
+
+  function renderSteps(steps){
+    (steps || []).forEach(function(s){
+      logLine(s.ok ? 'g' : 'r', now(), (s.ok ? '✅ ' : '❌ ') + s.channel + ' — ' + s.detail);
+    });
+  }
+
+  function renderReuse(h){
+    var bar = $('reuseBar');
+    if (h.reused){
+      bar.className = 'reuse';
+      bar.innerHTML = '<span>🔗</span><div><b>已复用「智能音箱」插件的登录态 · 无需再次登录</b><br>' +
+        '<span style="font-size:12px">自动同步 ' + esc(h.auto_accounts) + ' 组小米账号；设备列表、停止播放、音量、播报均走官方插件通道。' +
+        (h.channels && h.channels.miot_5_4 ? ' · MIoT 5-4 文本指令可用' : ' · 云端 NLP 备用通道') + '</span></div>';
+      setBadge('ok', '已复用登录态 · 打开即用');
+    } else if (h.has_credentials){
+      bar.className = 'reuse';
+      bar.innerHTML = '<span>🔑</span><div><b>使用手动导入的凭据</b><br><span style="font-size:12px">设备列表仍复用官方插件登录态。</span></div>';
+      setBadge('ok', '凭据就绪 · ' + esc(h.credential_source));
+    } else {
+      bar.className = 'reuse bad';
+      bar.innerHTML = '<span>⚠️</span><div><b>未能自动读取「智能音箱」插件的登录态</b><br>' +
+        '<span style="font-size:12px">设备列表与「仅播报」仍可用。请点「重新同步登录态」，或展开下方高级设置粘贴一次本机账号文件。</span></div>';
+      setBadge('bad', '云端指令待配置');
+      $('advBox').open = true;
+    }
+  }
+
+  async function loadHealth(){
+    try { renderReuse(await api('/health')); }
+    catch(e){ setBadge('bad', '后端未响应'); }
+  }
+
+  async function loadDevices(){
+    var sel = $('deviceSel');
+    sel.innerHTML = '<option value="">读取中…</option>';
+    try {
+      var r = await api('/devices');
+      var list = r.devices || [];
+      if (!list.length){
+        sel.innerHTML = '<option value="">未发现音箱（请先在「智能音箱」插件登录小米账号）</option>';
+        return;
+      }
+      var saved = localStorage.getItem('xtc_device') || '';
+      sel.innerHTML = list.map(function(d){
+        var val = d.account_id + '||' + d.device_id + '||' + d.miot_did;
+        return '<option value="' + esc(val) + '">' + esc(d.name) + (d.hardware ? ' · ' + esc(d.hardware) : '') + '</option>';
+      }).join('');
+      if (saved) sel.value = saved;
+      applyDevice();
+    } catch(e){
+      sel.innerHTML = '<option value="">设备列表读取失败：' + esc(e.message) + '</option>';
+    }
+  }
+
+  function applyDevice(){
+    var v = $('deviceSel').value || '';
+    var parts = v.split('||');
+    selected.account_id = parts[0] || '';
+    selected.device_id = parts[1] || '';
+    selected.miot_did = parts[2] || '';
+    if (v) localStorage.setItem('xtc_device', v);
+  }
+
+  function requireDevice(){
+    applyDevice();
+    if (!selected.device_id){
+      announce('请先选择一台音箱');
+      logLine('y', now(), '⚠️ 请先选择目标音箱');
+      return false;
+    }
+    return true;
+  }
+
+  function commandBody(text, extra){
+    var b = {
+      account_id: selected.account_id,
+      device_id: selected.device_id,
+      miot_did: selected.miot_did,
+      text: text,
+      silent: $('optSilent').checked,
+      pre_action: $('optPre').value,
+      quiet_volume: 10
+    };
+    if (extra) for (var k in extra) b[k] = extra[k];
+    return b;
+  }
+
+  async function runCommand(){
+    var text = $('cmdInput').value.trim();
+    if (!text){ announce('请输入指令内容'); return; }
+    if (!requireDevice()) return;
+    var btn = $('btnRun');
+    btn.disabled = true; btn.textContent = '下发中…';
+    logLine('b', now(), '▶ 下发指令：「' + text + '」 → ' + selected.device_id);
+    try {
+      var r = await api('/command', 'POST', commandBody(text));
+      renderSteps(r.steps);
+      logLine(r.success ? 'g' : 'y', now(), (r.success ? '🎉 ' : '⚠️ ') + (r.note || ''));
+      $('resultNotice').innerHTML = '<div class="notice' + (r.success ? '' : ' warn') + '">' + esc(r.note || '') + '</div>';
+      if (r.need_import) $('advBox').open = true;
+      announce(r.success ? '指令已下发' : '下发未成功，请查看日志');
+    } catch(e){
+      logLine('r', now(), '❌ 请求失败：' + e.message);
+      announce('下发失败');
+    } finally {
+      btn.disabled = false; btn.textContent = '执行指令';
+    }
+  }
+
+  async function sayOnly(){
+    var text = $('cmdInput').value.trim();
+    if (!text || !requireDevice()) return;
+    try {
+      var r = await api('/command', 'POST', commandBody(text, {say_only:true}));
+      renderSteps(r.steps);
+      logLine(r.success ? 'g' : 'r', now(), (r.success ? '🔊 ' : '❌ ') + '仅播报：' + (r.note || r.error || ''));
+      announce(r.success ? '已播报（不执行）' : '播报失败');
+    } catch(e){ logLine('r', now(), '❌ 播报失败：' + e.message); }
+  }
+
+  async function loadLogs(){
+    consoleEl.innerHTML = '';
+    try {
+      var r = await api('/logs');
+      (r.logs || []).forEach(function(entry){
+        logLine('b', entry.time, (entry.ok ? '✅ ' : '⚠️ ') + entry.text + '  [' + entry.channel + ']');
+        renderSteps(entry.steps);
+      });
+      if (!(r.logs || []).length) logLine('d', '', '暂无记录，输入一条指令试试吧。');
+    } catch(e){ logLine('r', now(), '日志读取失败：' + e.message); }
+  }
+
+  async function redetect(){
+    $('redetectResult').textContent = '同步中…';
+    try {
+      var r = await api('/redetect', 'POST', {});
+      $('redetectResult').textContent = r.note;
+      logLine(r.reused ? 'g' : 'y', now(), '🔄 ' + r.note);
+      await loadHealth();
+    } catch(e){ $('redetectResult').textContent = '同步失败：' + e.message; }
+  }
+
+  async function testCredential(){
+    if (!requireDevice()) return;
+    try {
+      var r = await api('/test', 'POST', {device_id: selected.device_id});
+      logLine(r.success ? 'g' : 'r', now(),
+        '🧪 凭据自检：HTTP ' + r.status + ' / code=' + r.code + ' — ' + (r.note || r.error || ''));
+      announce(r.success ? '凭据有效' : '凭据不可用');
+    } catch(e){ logLine('r', now(), '🧪 自检失败：' + e.message); }
+  }
+
+  async function loadConfig(){
+    try {
+      var r = await api('/config');
+      $('cfgStatus').textContent = r.has_credentials
+        ? ('凭据可用 · 来源 ' + r.credential_source)
+        : '自动复用未生效，可手动导入';
+      if (r.config && r.config.user_id) $('cfgUserId').value = r.config.user_id;
+      if (r.has_credentials) {
+        $('cfgToken').placeholder = '已保存 ' + r.config.service_token + '（留空表示不修改）';
+        $('cfgSsec').placeholder = r.config.ssecurity ? ('已保存 ' + r.config.ssecurity) : 'accounts 文件里的 ssecurity';
+        $('cfgCookie').placeholder = r.config.cookie ? ('已保存 ' + r.config.cookie + '（留空表示不修改）') : 'userId=xxx; serviceToken=xxx; …';
+      }
+    } catch(e){}
+  }
+
+  async function saveConfig(){
+    var body = {
+      user_id: $('cfgUserId').value.trim(),
+      service_token: $('cfgToken').value.trim(),
+      ssecurity: $('cfgSsec').value.trim(),
+      cookie: $('cfgCookie').value.trim(),
+      default_device_id: selected.device_id
+    };
+    try {
+      var r = await api('/config', 'POST', body);
+      $('cfgStatus').textContent = r.has_credentials ? ('已保存 · 来源 ' + r.credential_source) : '已保存（凭据不完整）';
+      logLine('g', now(), '💾 凭据配置已保存');
+      await loadHealth();
+      announce('已保存');
+    } catch(e){ logLine('r', now(), '保存失败：' + e.message); }
+  }
+
+  async function importConfig(){
+    var raw = $('cfgImport').value.trim();
+    if (!raw){ $('importStatus').textContent = '请先粘贴内容'; return; }
+    $('importStatus').textContent = '识别中…';
+    try {
+      var r = await api('/config', 'POST', {import_json: raw, default_device_id: selected.device_id});
+      $('importStatus').textContent = r.imported
+        ? ('识别成功 · ' + (r.has_credentials ? '凭据已可用' : '凭据不完整'))
+        : (r.error || '未识别到 serviceToken');
+      logLine(r.imported ? 'g' : 'y', now(),
+        r.imported ? '📥 已从粘贴内容导入小米账号凭据' : ('⚠️ 粘贴内容未识别：' + (r.error || '')));
+      if (r.imported){ await loadHealth(); await loadConfig(); announce('凭据导入成功'); }
+    } catch(e){
+      $('importStatus').textContent = '导入失败：' + e.message;
+      logLine('r', now(), '❌ 导入失败：' + e.message);
+    }
+  }
+
+  // ---- 事件绑定 ----
+  $('chips').innerHTML = QUICK.map(function(q){
+    return '<button class="chip" data-q="' + esc(q) + '">' + esc(q) + '</button>';
+  }).join('');
+  $('chips').addEventListener('click', function(e){
+    var t = e.target.closest ? e.target.closest('.chip') : null;
+    if (!t) return;
+    $('cmdInput').value = t.getAttribute('data-q');
+    $('cmdInput').focus();
+  });
+  $('cmdInput').addEventListener('keydown', function(e){
+    if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); runCommand(); }
+  });
+  $('deviceSel').addEventListener('change', applyDevice);
+  $('btnRun').addEventListener('click', runCommand);
+  $('btnSay').addEventListener('click', sayOnly);
+  $('btnRefreshDev').addEventListener('click', loadDevices);
+  $('btnLoadLogs').addEventListener('click', loadLogs);
+  $('btnClearLogs').addEventListener('click', async function(){
+    try { await api('/logs/clear','POST',{}); loadLogs(); } catch(e){}
+  });
+  $('btnRedetect').addEventListener('click', redetect);
+  $('btnTest').addEventListener('click', testCredential);
+  $('btnSaveCfg').addEventListener('click', saveConfig);
+  $('btnImport').addEventListener('click', importConfig);
+  $('btnClearCfg').addEventListener('click', async function(){
+    $('cfgUserId').value = ''; $('cfgToken').value = ''; $('cfgCookie').value = ''; $('cfgSsec').value = '';
+    try { await api('/config','POST',{clear:true}); await loadHealth(); await loadConfig(); logLine('y', now(), '🗑 手动凭据已清空'); } catch(e){}
+  });
+
+  loadHealth(); loadDevices(); loadConfig(); loadLogs();
+})();
+</script>
+</body>
+</html>
