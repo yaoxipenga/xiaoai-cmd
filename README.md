@@ -60,6 +60,15 @@ Songloft 的 `songloft.storage` 按插件隔离，插件之间读不到彼此的
 
 > 凭据只留在本机内存 / 本插件 storage，只用于调用小米云 API 与小米账号服务器，不会发往任何第三方。`command` 权限仅用于上述兼容兜底读取本机文件。
 
+## 账号与凭据安全
+
+- 本仓库（含**全部提交历史**与可分发的 ZIP 安装包）**不包含任何账号、密码、`serviceToken`、`passToken`、`ssecurity`，也不包含任何 Songloft 实例地址**。源码里出现的 `pass_token` / `serviceToken` 等只是字段名与运行时变量，值在插件运行时才从宿主取得。
+- 插件**不把小米凭据写进磁盘**：从宿主 `/accounts` 取得 `passToken`，向小米账号服务器换取 token 后仅在内存中缓存 30 分钟，过期自动重换；插件 storage 只保存指令日志和用户手动填写的配置。
+- 所有携带凭据的请求只发往小米官方域名（`account.xiaomi.com`、`api2.mina.mi.com`、`api.io.mi.com`），不发往本仓库、作者或任何第三方服务器。
+- `.gitignore` 已排除 `accounts`、`.env`、`*token*.txt`、`xtc_*.json` 等常见凭据文件；本地改动提交前请先确认没有把这类文件加入 git。
+- GitHub 提交历史里出现的邮箱只是本机 `git config user.email` 的**提交者邮箱**（GitHub 公开元数据），不是任何服务的登录凭据；若不想公开，可在 GitHub 设置里启用私密提交邮箱。
+- 实机排查时使用过的 Songloft 站点管理员账号密码只存在于当次会话，未写入任何仓库文件、脚本或配置；相关临时文件已做脱敏处理。
+
 ## 指令执行通道
 
 1. **MIoT `5-4` execute-text-directive**（主）：官方 MIoT 动作，`siid=5, aiid=4`，参数 `[文本, 是否静默]`，效果等同直接对小爱说出这句话。需要 `xiaomiio` 的 `serviceToken` + `ssecurity` 与设备 `miotDID`。
@@ -106,5 +115,6 @@ xiaoai-cmd/
 ├── static/icon.svg        ← 图标（GitHub 发现页读取）
 ├── build.py               ← 重算哈希 + 打包
 ├── publish.ps1            ← 一键替换地址并推送
+├── .gitignore             ← 排除凭据类文件
 └── README.md
 ```

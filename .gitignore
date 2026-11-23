@@ -2,3 +2,15 @@ __pycache__/
 *.pyc
 .DS_Store
 Thumbs.db
+
+# 凭据与本地账号数据（禁止提交）
+.env
+.env.*
+*token*.txt
+*secret*
+accounts
+accounts.json
+xtc_*.txt
+xtc_*.json
+*.pem
+*.key
